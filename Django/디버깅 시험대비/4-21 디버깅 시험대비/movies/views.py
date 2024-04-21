@@ -1,16 +1,19 @@
 from django.shortcuts import render, redirect
+from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
 from .models import Movie, Comment
 from .forms import MovieForm, CommentForm
 # Create your views here.
+@require_http_methods(['GET'])
 def index(request):
     movies = Movie.objects.all()
-    print(request.user.is_authenticated)
     context = {
-        'moives' : movies,
+        'movies' : movies,
     }
     return render(request, 'movies/index.html', context)
 
-
+@require_http_methods(['GET', 'POST'])
+@login_required
 def create(request):
     if request.method == 'POST':
         form = MovieForm(request.POST)
@@ -26,9 +29,9 @@ def create(request):
     }
     return render(request, 'movies/create.html', context)
 
-
-def detail(request, pk):
-    movie = Movie.objects.get(pk = pk)
+@require_http_methods(['GET'])
+def detail(request, movies_pk):
+    movie = Movie.objects.get(pk = movies_pk)
     comments = movie.comment_set.all()
     comment_form = CommentForm()
     context = {
@@ -36,30 +39,38 @@ def detail(request, pk):
         'comments' : comments,
         'comment_form' : comment_form,
     }
-
     return render(request, 'movies/detail.html', context)
 
-def update(request, pk):
-    movie = Movie.objects.get(pk = pk)
+@require_http_methods(['GET', 'POST'])
+@login_required
+def update(request, movies_pk):
+    movie = Movie.objects.get(pk = movies_pk)
     if request.user == movie.user:
         if request.method == 'POST':
             form = MovieForm(request.POST, instance=movie)
             if form.is_valid():
                 form.save()
                 return redirect('movies:detail', movie.pk)
-    else:
-        form = MovieForm()
-    context = {
-        'form' : form
-    }
-    return render(request, 'movies/update.html', context)
+        else:
+            form = MovieForm(instance=movie)
+        context = {
+            'form' : form,
+            'movie': movie,
+        }
+        return render(request, 'movies/update.html', context)
+    return redirect("movies:detail", movie.pk)
 
-def delete(request, pk):
-    movie = Movie.objects.get(pk = pk)
+@require_http_methods(['POST'])
+@login_required
+def delete(request, movies_pk):
+    movie = Movie.objects.get(pk = movies_pk)
     if request.user == movie.user:
         movie.delete()
-    return redirect('movies:index')
+        return redirect('movies:index')
+    return redirect('movies:detail', movie.pk)
 
+@require_http_methods(['POST'])
+@login_required
 def comment_create(request, movies_pk):
     movie = Movie.objects.get(pk = movies_pk)
     comments = movie.comment_set.all()
@@ -77,6 +88,8 @@ def comment_create(request, movies_pk):
     }
     return render(request, 'movies/detail.html', context)
 
+@require_http_methods(['POST'])
+@login_required
 def comment_delete(request, movies_pk, comment_pk):
     comment = Comment.objects.get(pk=comment_pk)
 
@@ -85,13 +98,14 @@ def comment_delete(request, movies_pk, comment_pk):
 
     return redirect('movies:detail', movies_pk)
 
+@require_http_methods(['POST'])
+@login_required
 def likes(request, movies_pk):
-
     movie = Movie.objects.get(pk=movies_pk)
 
-    if request.user in movie.like_users.all():
-        movie.like_users.remove(request.user)
+    if request.user in movie.like_user.all():
+        movie.like_user.remove(request.user)
     else:
-        movie.like_users.add(request.user)
+        movie.like_user.add(request.user)
 
-    return redirect('movies:detail', movies_pk)
+    return redirect('movies:index')
